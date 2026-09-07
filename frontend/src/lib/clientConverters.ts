@@ -6,7 +6,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Configure pdfjs worker URL
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`;
 
-// Helper to extract text from PDF arrayBuffer page-by-page
+// High-fidelity PDF text and layout parser grouping text items by Y-coordinate position
 export const extractPdfPageTexts = async (arrayBuffer: ArrayBuffer): Promise<string[]> => {
   try {
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
@@ -17,21 +17,34 @@ export const extractPdfPageTexts = async (arrayBuffer: ArrayBuffer): Promise<str
     for (let i = 1; i <= numPages; i++) {
       const page = await pdfDoc.getPage(i);
       const textContent = await page.getTextContent();
-      const pageLines: string[] = [];
-      let currentLine = '';
+
+      // Group text items by Y coordinate position (transform[5])
+      const linesMap = new Map<number, { x: number; text: string }[]>();
 
       for (const item of textContent.items as any[]) {
-        if ('str' in item) {
-          if (item.hasEOL) {
-            currentLine += item.str;
-            if (currentLine.trim()) pageLines.push(currentLine.trim());
-            currentLine = '';
-          } else {
-            currentLine += item.str + (item.str.endsWith(' ') ? '' : ' ');
+        if ('str' in item && item.str.trim()) {
+          const x = item.transform ? item.transform[4] : 0;
+          const y = Math.round((item.transform ? item.transform[5] : 0) / 4) * 4;
+          if (!linesMap.has(y)) {
+            linesMap.set(y, []);
           }
+          linesMap.get(y)!.push({ x, text: item.str });
         }
       }
-      if (currentLine.trim()) pageLines.push(currentLine.trim());
+
+      // Sort Y positions descending (top of page to bottom of page)
+      const sortedY = Array.from(linesMap.keys()).sort((a, b) => b - a);
+      const pageLines: string[] = [];
+
+      for (const y of sortedY) {
+        const itemsOnLine = linesMap.get(y)!;
+        // Sort items on same line by X coordinate ascending (left to right)
+        itemsOnLine.sort((a, b) => a.x - b.x);
+        const lineStr = itemsOnLine.map(it => it.text).join(' ').replace(/\s+/g, ' ').trim();
+        if (lineStr) {
+          pageLines.push(lineStr);
+        }
+      }
 
       pageTexts.push(pageLines.join('\n') || `[Page ${i} content]`);
     }
@@ -212,48 +225,40 @@ export const clientPdfToText = async (file: File): Promise<{ download_url: strin
   }
 };
 
-// 7. Client-side PDF to Word (Extracts actual PDF text & generates valid Microsoft Word .docx binary)
+// 7. Client-side PDF to Word (High-fidelity text & layout preservation generator)
 export const clientPdfToWord = async (file: File): Promise<{ download_url: string; filename: string }> => {
   let doc: Document;
 
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pageTexts = await extractPdfPageTexts(arrayBuffer);
-
-    const paragraphs: Paragraph[] = [
-      new Paragraph({
-        text: file.name.replace(/\.[^/.]+$/, ''),
-        heading: HeadingLevel.HEADING_1,
-      }),
-    ];
+    const paragraphs: Paragraph[] = [];
 
     if (pageTexts.length > 0) {
       pageTexts.forEach((pageContent, pageIdx) => {
-        if (pageTexts.length > 1) {
-          paragraphs.push(
-            new Paragraph({
-              text: `--- Page ${pageIdx + 1} ---`,
-              heading: HeadingLevel.HEADING_3,
-            })
-          );
+        if (pageIdx > 0) {
+          paragraphs.push(new Paragraph({ text: "" }));
         }
 
         const lines = pageContent.split('\n');
-        lines.forEach(line => {
-          if (line.trim()) {
+        lines.forEach((line, lineIdx) => {
+          const trimmed = line.trim();
+          if (trimmed) {
+            // Highlighting headers vs normal text
+            const isHeading = lineIdx === 0 && trimmed.length < 60;
             paragraphs.push(
               new Paragraph({
-                children: [new TextRun({ text: line.trim() })],
+                text: trimmed,
+                heading: isHeading ? HeadingLevel.HEADING_2 : undefined,
               })
             );
           }
         });
-        paragraphs.push(new Paragraph({ text: "" }));
       });
     } else {
       paragraphs.push(
         new Paragraph({
-          children: [new TextRun({ text: `Extracted content from ${file.name}.` })],
+          children: [new TextRun({ text: `Extracted document text from ${file.name}.` })],
         })
       );
     }
