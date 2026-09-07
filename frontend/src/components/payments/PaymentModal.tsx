@@ -27,6 +27,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<any>(null);
+  const [utrError, setUtrError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -39,8 +40,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
-
-  const [utrError, setUtrError] = useState<string | null>(null);
 
   const handlePayNow = (e: React.FormEvent) => {
     e.preventDefault();
