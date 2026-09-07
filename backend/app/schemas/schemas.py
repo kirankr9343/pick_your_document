@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
@@ -22,12 +22,14 @@ class JobResponse(BaseModel):
     output_filename: Optional[str] = None
     status: str
     file_size: int
+    processing_time_ms: Optional[float] = 0.0
     download_url: Optional[str] = None
     error_code: Optional[str] = None
     error_message: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
+    user_email: Optional[str] = None
 
 class OcrResultResponse(StandardResponse):
     extracted_text: str
@@ -66,7 +68,10 @@ class UserResponse(BaseModel):
     id: str
     email: str
     name: Optional[str] = None
+    role: str = "USER"
+    status: str = "active"
     is_admin: bool
+    last_login_at: Optional[datetime] = None
     created_at: datetime
 
 class Token(BaseModel):
@@ -74,13 +79,68 @@ class Token(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
-# Admin Stats Schema
-class AdminStatsResponse(BaseModel):
+# Admin Management Schemas
+class RoleUpdateSchema(BaseModel):
+    role: str = Field(..., description="USER, ADMIN, or SUPER_ADMIN")
+
+class StatusUpdateSchema(BaseModel):
+    status: str = Field(..., description="active or disabled")
+
+class ToolStatusResponse(BaseModel):
+    tool_id: str
+    enabled: bool
+    category: str
+    usage_count: int
+    success_count: int
+    failed_count: int
+    total_processing_time_ms: float
+    avg_processing_time_ms: float
+    updated_at: datetime
+
+class ToolToggleSchema(BaseModel):
+    enabled: bool
+
+class AdminAuditLogResponse(BaseModel):
+    id: str
+    admin_user_id: str
+    admin_email: str
+    action: str
+    target_type: str
+    target_id: str
+    metadata_json: Optional[str] = None
+    created_at: datetime
+
+class PaginatedUsersResponse(BaseModel):
+    users: List[UserResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+class PaginatedJobsResponse(BaseModel):
+    jobs: List[JobResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+class PaginatedAuditLogsResponse(BaseModel):
+    logs: List[AdminAuditLogResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+class AdminDashboardMetrics(BaseModel):
     total_users: int
+    new_users_today: int
     total_conversions: int
     conversions_today: int
+    successful_conversions: int
     failed_conversions: int
-    average_processing_time: float
+    success_rate_percent: float
     total_file_size_mb: float
-    top_tools: List[dict]
-    system_health: dict
+    average_processing_time_sec: float
+    active_jobs: int
+    expired_files_count: int
+    top_tools: List[Dict[str, Any]]

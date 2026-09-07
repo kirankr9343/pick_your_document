@@ -11,7 +11,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import validate_file_security, generate_random_storage_path, decode_access_token
-from app.models.models import User, ProcessingJob, UsageRecord
+from app.models.models import User, ProcessingJob, UsageRecord, ToolStatus
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
@@ -26,22 +26,57 @@ async def get_current_user(
         return None
     user_id = payload["sub"]
     result = await db.execute(select(User).where(User.id == user_id))
-    return result.scalars().first()
-
-async def get_current_admin(current_user: Optional[User] = Depends(get_current_user)) -> User:
-    if not current_user or not current_user.is_admin:
+    user = result.scalars().first()
+    if user and user.status == "disabled":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required for this action."
+            detail="Your account has been disabled by site administrators."
+        )
+    return user
+
+async def get_current_admin(current_user: Optional[User] = Depends(get_current_user)) -> User:
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token is required to access admin resources."
+        )
+    if current_user.status == "disabled":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account disabled."
+        )
+    is_admin_role = current_user.role in ("ADMIN", "SUPER_ADMIN") or current_user.is_admin
+    if not is_admin_role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin privileges required."
         )
     return current_user
+
+async def get_current_super_admin(current_user: User = Depends(get_current_admin)) -> User:
+    if current_user.role != "SUPER_ADMIN" and current_user.email.lower() != settings.INITIAL_ADMIN_EMAIL.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Super Admin privileges required."
+        )
+    return current_user
+
+async def check_tool_enabled(tool_id: str, db: AsyncSession) -> bool:
+    """Verifies that a conversion tool is currently enabled in the database."""
+    result = await db.execute(select(ToolStatus).where(ToolStatus.tool_id == tool_id))
+    tool_status = result.scalars().first()
+    if tool_status and not tool_status.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"The '{tool_id}' tool has been temporarily disabled by site administrators."
+        )
+    return True
 
 async def save_uploaded_file(file: UploadFile) -> Tuple[str, str, int]:
     """
     Saves an uploaded file safely after validating file size & extension.
     Returns (sanitized_original_filename, internal_temp_filepath, file_size_bytes).
     """
-    # Read file content into memory or temporary stream
     content = await file.read()
     file_size = len(content)
     
@@ -67,7 +102,8 @@ async def record_job_and_usage(
 ) -> Tuple[ProcessingJob, str]:
     """Records job completion and usage analytics in DB."""
     download_token = uuid.uuid4().hex
-    processing_time = time.time() - start_time
+    processing_time_sec = time.time() - start_time
+    processing_time_ms = processing_time_sec * 1000.0
     expires_at = datetime.utcnow() + timedelta(hours=settings.FILE_EXPIRY_HOURS)
 
     job = ProcessingJob(
@@ -77,6 +113,7 @@ async def record_job_and_usage(
         output_filename=output_filename,
         status="completed",
         file_size=file_size,
+        processing_time_ms=processing_time_ms,
         download_token=download_token,
         completed_at=datetime.utcnow(),
         expires_at=expires_at
@@ -87,9 +124,28 @@ async def record_job_and_usage(
         user_id=user_id,
         tool_type=tool_type,
         file_size=file_size,
-        processing_time=processing_time
+        processing_time=processing_time_sec
     )
     db.add(usage)
+
+    # Update ToolStatus counters
+    tool_res = await db.execute(select(ToolStatus).where(ToolStatus.tool_id == tool_type))
+    t_status = tool_res.scalars().first()
+    if not t_status:
+        t_status = ToolStatus(
+            tool_id=tool_type,
+            enabled=True,
+            category="pdf",
+            usage_count=1,
+            success_count=1,
+            failed_count=0,
+            total_processing_time_ms=processing_time_ms
+        )
+        db.add(t_status)
+    else:
+        t_status.usage_count = (t_status.usage_count or 0) + 1
+        t_status.success_count = (t_status.success_count or 0) + 1
+        t_status.total_processing_time_ms = (t_status.total_processing_time_ms or 0.0) + processing_time_ms
 
     await db.commit()
     await db.refresh(job)

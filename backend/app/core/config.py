@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
 
+    # Initial Super-Admin Configuration
+    INITIAL_ADMIN_EMAIL: str = "kirankr93439343@gmail.com"
+
     # Rate Limits
     ANONYMOUS_REQUESTS_PER_HOUR: int = 60
     AUTHENTICATED_REQUESTS_PER_HOUR: int = 300

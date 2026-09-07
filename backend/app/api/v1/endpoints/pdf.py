@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.api.deps import save_uploaded_file, record_job_and_usage, get_current_user
+from app.api.deps import save_uploaded_file, record_job_and_usage, get_current_user, check_tool_enabled
 from app.models.models import User
 from app.schemas.schemas import StandardResponse, CompressPdfResultResponse
 from app.services.processor import ProcessingError
@@ -20,6 +20,7 @@ async def merge_pdfs(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("merge-pdf", db)
     start_time = time.time()
     saved_paths = []
     total_size = 0
@@ -60,6 +61,7 @@ async def split_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("split-pdf", db)
     start_time = time.time()
     orig_name, temp_path, file_size = await save_uploaded_file(file)
     processor = SplitPdfProcessor()
@@ -88,6 +90,7 @@ async def compress_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("compress-pdf", db)
     start_time = time.time()
     orig_name, temp_path, file_size = await save_uploaded_file(file)
     processor = CompressPdfProcessor()

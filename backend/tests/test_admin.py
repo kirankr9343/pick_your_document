@@ -1,0 +1,102 @@
+import os
+import asyncio
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+from app.core.database import init_db
+from app.core.config import settings
+
+@pytest.fixture(autouse=True)
+def setup_db():
+    asyncio.run(init_db())
+
+def test_initial_admin_auto_promotion():
+    email = "kirankr93439343@gmail.com"
+    payload = {"email": email, "password": "supersecretpass123", "name": "Kiran Admin"}
+    with TestClient(app) as client:
+        # Register
+        reg_res = client.post("/api/v1/auth/register", json=payload)
+        if reg_res.status_code == 400: # Already exists, try login
+            login_res = client.post("/api/v1/auth/login", json={"email": email, "password": "supersecretpass123"})
+            assert login_res.status_code == 200
+            data = login_res.json()
+        else:
+            assert reg_res.status_code == 200
+            data = reg_res.json()
+
+        assert data["user"]["role"] == "SUPER_ADMIN"
+        assert data["user"]["is_admin"] is True
+
+def test_non_admin_forbidden_access():
+    email = f"normaluser_{os.urandom(4).hex()}@example.com"
+    payload = {"email": email, "password": "normalpassword123", "name": "Normal User"}
+    with TestClient(app) as client:
+        reg_res = client.post("/api/v1/auth/register", json=payload)
+        token = reg_res.json()["access_token"]
+
+        headers = {"Authorization": f"Bearer {token}"}
+        # Attempt accessing admin endpoints
+        dash_res = client.get("/api/v1/admin/dashboard", headers=headers)
+        assert dash_res.status_code == 403
+
+        users_res = client.get("/api/v1/admin/users", headers=headers)
+        assert users_res.status_code == 403
+
+        tools_res = client.get("/api/v1/admin/tools", headers=headers)
+        assert tools_res.status_code == 403
+
+def test_admin_dashboard_metrics_and_tool_toggle():
+    admin_email = "kirankr93439343@gmail.com"
+    with TestClient(app) as client:
+        login_res = client.post("/api/v1/auth/login", json={"email": admin_email, "password": "supersecretpass123"})
+        if login_res.status_code != 200:
+            reg_res = client.post("/api/v1/auth/register", json={"email": admin_email, "password": "supersecretpass123"})
+            token = reg_res.json()["access_token"]
+        else:
+            token = login_res.json()["access_token"]
+
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Test Dashboard metrics
+        dash_res = client.get("/api/v1/admin/dashboard", headers=headers)
+        assert dash_res.status_code == 200
+        metrics = dash_res.json()
+        assert "total_users" in metrics
+        assert "total_conversions" in metrics
+        assert "success_rate_percent" in metrics
+
+        # Test Get Tools
+        tools_res = client.get("/api/v1/admin/tools", headers=headers)
+        assert tools_res.status_code == 200
+        tools = tools_res.json()
+        assert len(tools) >= 10
+
+        # Test Toggle Tool
+        pdf_tool = next(t for t in tools if t["tool_id"] == "pdf-to-word")
+        toggle_res = client.patch(
+            "/api/v1/admin/tools/pdf-to-word",
+            headers=headers,
+            json={"enabled": not pdf_tool["enabled"]}
+        )
+        assert toggle_res.status_code == 200
+        assert toggle_res.json()["enabled"] == (not pdf_tool["enabled"])
+
+        # Re-enable tool
+        client.patch(
+            "/api/v1/admin/tools/pdf-to-word",
+            headers=headers,
+            json={"enabled": True}
+        )
+
+def test_admin_audit_logs():
+    admin_email = "kirankr93439343@gmail.com"
+    with TestClient(app) as client:
+        login_res = client.post("/api/v1/auth/login", json={"email": admin_email, "password": "supersecretpass123"})
+        token = login_res.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        audit_res = client.get("/api/v1/admin/audit-logs", headers=headers)
+        assert audit_res.status_code == 200
+        data = audit_res.json()
+        assert "logs" in data
+        assert "total" in data

@@ -1,4 +1,5 @@
 import urllib.parse
+from datetime import datetime
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,30 +13,45 @@ from app.api.deps import get_current_user
 
 router = APIRouter()
 
+def _check_and_apply_admin_role(user: User) -> bool:
+    """Helper to check if user email matches initial admin email and assign SUPER_ADMIN role."""
+    if user.email.lower() == settings.INITIAL_ADMIN_EMAIL.lower():
+        user.role = "SUPER_ADMIN"
+        user.is_admin = True
+        return True
+    return False
+
 @router.post("/register", response_model=Token)
 async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == user_in.email.lower()))
+    email_lower = user_in.email.lower()
+    result = await db.execute(select(User).where(User.email == email_lower))
     if result.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this email already exists."
         )
 
-    # Check if first user to make them admin
     all_users = await db.execute(select(User))
     is_first = len(all_users.scalars().all()) == 0
+    is_initial_admin = email_lower == settings.INITIAL_ADMIN_EMAIL.lower()
+    
+    role = "SUPER_ADMIN" if is_initial_admin else ("ADMIN" if is_first else "USER")
+    is_admin = is_initial_admin or is_first
 
     user = User(
-        email=user_in.email.lower(),
+        email=email_lower,
         password_hash=get_password_hash(user_in.password),
-        name=user_in.name or user_in.email.split("@")[0],
-        is_admin=is_first
+        name=user_in.name or email_lower.split("@")[0],
+        role=role,
+        status="active",
+        is_admin=is_admin,
+        last_login_at=datetime.utcnow()
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    token = create_access_token({"sub": user.id, "email": user.email})
+    token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
     return Token(
         access_token=token,
         token_type="bearer",
@@ -43,14 +59,18 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
             id=user.id,
             email=user.email,
             name=user.name,
+            role=user.role,
+            status=user.status,
             is_admin=user.is_admin,
+            last_login_at=user.last_login_at,
             created_at=user.created_at
         )
     )
 
 @router.post("/login", response_model=Token)
 async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == credentials.email.lower()))
+    email_lower = credentials.email.lower()
+    result = await db.execute(select(User).where(User.email == email_lower))
     user = result.scalars().first()
 
     if not user or not verify_password(credentials.password, user.password_hash):
@@ -59,7 +79,18 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
             detail="Incorrect email or password."
         )
 
-    token = create_access_token({"sub": user.id, "email": user.email})
+    if user.status == "disabled":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been disabled by site administrators."
+        )
+
+    # Server-side promotion check for INITIAL_ADMIN_EMAIL
+    _check_and_apply_admin_role(user)
+    user.last_login_at = datetime.utcnow()
+    await db.commit()
+
+    token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
     return Token(
         access_token=token,
         token_type="bearer",
@@ -67,7 +98,10 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
             id=user.id,
             email=user.email,
             name=user.name,
+            role=user.role,
+            status=user.status,
             is_admin=user.is_admin,
+            last_login_at=user.last_login_at,
             created_at=user.created_at
         )
     )
@@ -80,7 +114,10 @@ async def get_me(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         email=current_user.email,
         name=current_user.name,
+        role=current_user.role,
+        status=current_user.status,
         is_admin=current_user.is_admin,
+        last_login_at=current_user.last_login_at,
         created_at=current_user.created_at
     )
 
@@ -136,26 +173,43 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
 
         user_info = user_info_res.json()
 
-    email = user_info.get("email")
+    email = user_info.get("email").lower()
     name = user_info.get("name") or email.split("@")[0]
 
-    result = await db.execute(select(User).where(User.email == email.lower()))
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalars().first()
+
+    is_initial_admin = email == settings.INITIAL_ADMIN_EMAIL.lower()
 
     if not user:
         all_users = await db.execute(select(User))
         is_first = len(all_users.scalars().all()) == 0
+        role = "SUPER_ADMIN" if is_initial_admin else ("ADMIN" if is_first else "USER")
+        is_admin = is_initial_admin or is_first
+
         user = User(
-            email=email.lower(),
+            email=email,
             password_hash=get_password_hash("GOOGLE_OAUTH_ACCOUNT_" + email),
             name=name,
-            is_admin=is_first
+            role=role,
+            status="active",
+            is_admin=is_admin,
+            last_login_at=datetime.utcnow()
         )
         db.add(user)
         await db.commit()
         await db.refresh(user)
+    else:
+        if user.status == "disabled":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been disabled by site administrators."
+            )
+        _check_and_apply_admin_role(user)
+        user.last_login_at = datetime.utcnow()
+        await db.commit()
 
-    jwt_token = create_access_token({"sub": user.id, "email": user.email})
+    jwt_token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
     return Token(
         access_token=jwt_token,
         token_type="bearer",
@@ -163,7 +217,10 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
             id=user.id,
             email=user.email,
             name=user.name,
+            role=user.role,
+            status=user.status,
             is_admin=user.is_admin,
+            last_login_at=user.last_login_at,
             created_at=user.created_at
         )
     )

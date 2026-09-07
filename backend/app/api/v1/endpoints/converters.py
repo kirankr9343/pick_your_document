@@ -1,9 +1,10 @@
+import os
 import time
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.api.deps import save_uploaded_file, record_job_and_usage, get_current_user
+from app.api.deps import save_uploaded_file, record_job_and_usage, get_current_user, check_tool_enabled
 from app.models.models import User
 from app.schemas.schemas import StandardResponse, OcrResultResponse
 from app.services.processor import ProcessingError
@@ -22,6 +23,7 @@ async def convert_pdf_to_word(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("pdf-to-word", db)
     start_time = time.time()
     orig_name, temp_path, file_size = await save_uploaded_file(file)
     processor = PdfToWordProcessor()
@@ -49,6 +51,7 @@ async def convert_word_to_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("word-to-pdf", db)
     start_time = time.time()
     orig_name, temp_path, file_size = await save_uploaded_file(file)
     processor = WordToPdfProcessor()
@@ -76,6 +79,7 @@ async def convert_pdf_to_text(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("pdf-to-text", db)
     start_time = time.time()
     orig_name, temp_path, file_size = await save_uploaded_file(file)
     processor = PdfToTextProcessor()
@@ -103,6 +107,7 @@ async def convert_image_to_text(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("image-to-text", db)
     start_time = time.time()
     orig_name, temp_path, file_size = await save_uploaded_file(file)
     processor = ImageOcrProcessor()
@@ -132,6 +137,7 @@ async def convert_image_to_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("image-to-pdf", db)
     start_time = time.time()
     saved_paths = []
     total_size = 0
@@ -171,6 +177,7 @@ async def convert_pdf_to_jpg(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
+    await check_tool_enabled("pdf-to-jpg", db)
     start_time = time.time()
     orig_name, temp_path, file_size = await save_uploaded_file(file)
     processor = PdfToJpgProcessor()
