@@ -75,6 +75,36 @@ export const AppContent: React.FC = () => {
     };
   }, [resendCooldown]);
 
+  // Google OAuth redirect listener (handles account choice from accounts.google.com)
+  useEffect(() => {
+    const handleGoogleRedirect = async () => {
+      const hash = window.location.hash;
+      if (hash.includes('access_token=')) {
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
+        if (accessToken) {
+          try {
+            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            if (res.ok) {
+              const profile = await res.json();
+              const selectedEmail = (profile.email || '').toLowerCase();
+              if (selectedEmail) {
+                window.history.replaceState(null, '', window.location.pathname);
+                setEmailInput(selectedEmail);
+                setAuthModalOpen(true);
+                handleGoogleAuth(selectedEmail);
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    };
+    handleGoogleRedirect();
+  }, []);
+
+
   const resetAuthForm = () => {
     setAuthStep(1);
     setAuthError(null);
@@ -286,12 +316,27 @@ export const AppContent: React.FC = () => {
     }
   };
 
-  // Google OAuth / Gmail Authentication Handler with 2-Step OTP Verification
+  // Google OAuth / Gmail Authentication Handler with Account Chooser & 2-Step OTP Verification
   const handleGoogleAuth = async (emailOverride?: string) => {
     setAuthError(null);
     setAuthSuccessMsg(null);
 
-    const targetEmail = (emailOverride || emailInput.trim() || 'kirankr93439343@gmail.com').toLowerCase();
+    // If no email override and no input provided, launch official Google Account Chooser page!
+    if (!emailOverride && !emailInput.trim()) {
+      const googleClientId = "53808903819-vkhdlldemtfo8iisb9f5b0ula465738.apps.googleusercontent.com";
+      const redirectUri = window.location.origin + window.location.pathname;
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${encodeURIComponent(googleClientId)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=token` +
+        `&scope=${encodeURIComponent('openid email profile')}` +
+        `&prompt=select_account`;
+
+      window.location.href = googleAuthUrl;
+      return;
+    }
+
+    const targetEmail = (emailOverride || emailInput.trim()).toLowerCase();
     setEmailInput(targetEmail);
     setAuthLoading(true);
 
@@ -322,6 +367,7 @@ export const AppContent: React.FC = () => {
       setAuthLoading(false);
     }
   };
+
 
 
   const handleLogout = async () => {
