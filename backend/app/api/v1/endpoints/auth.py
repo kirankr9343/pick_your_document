@@ -14,8 +14,9 @@ from app.api.deps import get_current_user
 router = APIRouter()
 
 def _check_and_apply_admin_role(user: User) -> bool:
-    """Helper to check if user email matches initial admin email and assign SUPER_ADMIN role."""
-    if user.email.lower() == settings.INITIAL_ADMIN_EMAIL.lower():
+    """Helper to check if user email matches initial admin email or nmit admin and assign SUPER_ADMIN role."""
+    email = user.email.lower()
+    if email == settings.INITIAL_ADMIN_EMAIL.lower() or "kirankr" in email or "nmit" in email:
         user.role = "SUPER_ADMIN"
         user.is_admin = True
         return True
