@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     # Initial Super-Admin Configuration
     INITIAL_ADMIN_EMAIL: str = "kirankr93439343@gmail.com"
 
+    # SMTP Email OTP Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = "kirankr93439343@gmail.com"
+    SMTP_PASSWORD: Optional[str] = None
+    EMAILS_FROM_EMAIL: str = "kirankr93439343@gmail.com"
+
     # Rate Limits
     ANONYMOUS_REQUESTS_PER_HOUR: int = 60
     AUTHENTICATED_REQUESTS_PER_HOUR: int = 300

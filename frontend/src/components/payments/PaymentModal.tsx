@@ -32,7 +32,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const receiverUpiId = 'kirankr93439343@upi';
   const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=PickYourDocument&am=${amountInr}&cu=INR&tn=${encodeURIComponent(planName)}`;
-  const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiPayString)}`;
+  const qrCodeImageUrl = 'assets/gpay-qr.png';
 
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(receiverUpiId);
