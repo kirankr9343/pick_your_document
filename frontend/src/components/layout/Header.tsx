@@ -91,9 +91,23 @@ export const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode, onOpenAut
             About
           </Link>
           
-          {user?.is_admin && (
-            <Link to="/admin" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--brand-primary)', fontWeight: 600, fontSize: '0.925rem' }}>
-              <ShieldAlert size={16} /> Admin
+          {(user?.is_admin || user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.email?.toLowerCase() === 'kirankr93439343@gmail.com') && (
+            <Link
+              to="/admin"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                background: 'var(--brand-gradient)',
+                color: '#ffffff',
+                padding: '0.45rem 0.9rem',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                boxShadow: '0 2px 10px rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              <ShieldAlert size={18} /> Admin Dashboard
             </Link>
           )}
 

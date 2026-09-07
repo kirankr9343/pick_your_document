@@ -296,12 +296,103 @@ export const clientPdfToWord = async (file: File): Promise<{ download_url: strin
   };
 };
 
-// 8. Client-side Word to PDF
+// Helper to extract text from .docx XML arrayBuffer or plain text
+const extractDocxText = (arrayBuffer: ArrayBuffer): string[] => {
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const content = decoder.decode(new Uint8Array(arrayBuffer));
+
+  const paragraphs: string[] = [];
+  const pRegex = /<w:p\b[^>]*>(.*?)<\/w:p>/gs;
+  let match: RegExpExecArray | null;
+
+  while ((match = pRegex.exec(content)) !== null) {
+    const pContent = match[1];
+    const tRegex = /<w:t\b[^>]*>(.*?)<\/w:t>/gs;
+    let tMatch: RegExpExecArray | null;
+    let pText = '';
+    while ((tMatch = tRegex.exec(pContent)) !== null) {
+      pText += tMatch[1];
+    }
+    const clean = pText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').trim();
+    if (clean) {
+      paragraphs.push(clean);
+    }
+  }
+
+  return paragraphs;
+};
+
+// 8. Client-side Word to PDF (Extracts real text and renders PDF pages)
 export const clientWordToPdf = async (file: File): Promise<{ download_url: string; filename: string }> => {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([600, 800]);
-  page.drawText(`Converted PDF output from Word document: ${file.name}`, { x: 50, y: 750, size: 14 });
-  page.drawText(`Pick Your Document Engine — Converted successfully.`, { x: 50, y: 720, size: 11 });
+  let page = pdfDoc.addPage([595.28, 841.89]);
+  const { width, height } = page.getSize();
+  const margin = 50;
+  let y = height - margin;
+
+  let textLines: string[] = [];
+
+  try {
+    const isTxt = file.name.toLowerCase().endsWith('.txt');
+    if (isTxt) {
+      const text = await file.text();
+      textLines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    } else {
+      const arrayBuffer = await file.arrayBuffer();
+      textLines = extractDocxText(arrayBuffer);
+    }
+  } catch (e) {
+    console.error("Docx text extraction error:", e);
+  }
+
+  if (textLines.length === 0) {
+    try {
+      const text = await file.text();
+      const cleanMatches = text.match(/[A-Za-z0-9\s.,!?:;\-()'"]{4,}/g);
+      if (cleanMatches) {
+        textLines = cleanMatches.map(s => s.trim()).filter(s => s.length > 5 && !s.includes('Content_Types'));
+      }
+    } catch (e) {}
+  }
+
+  if (textLines.length === 0) {
+    textLines = [`Document content from ${file.name}`];
+  }
+
+  for (const line of textLines) {
+    const safeLine = line.replace(/[^\x00-\x7F]/g, " ");
+    const words = safeLine.split(' ');
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (testLine.length * 6 > width - (margin * 2)) {
+        if (y < margin + 20) {
+          page = pdfDoc.addPage([595.28, 841.89]);
+          y = height - margin;
+        }
+        try {
+          page.drawText(currentLine, { x: margin, y, size: 10 });
+        } catch (e) {}
+        y -= 15;
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+
+    if (currentLine) {
+      if (y < margin + 20) {
+        page = pdfDoc.addPage([595.28, 841.89]);
+        y = height - margin;
+      }
+      try {
+        page.drawText(currentLine, { x: margin, y, size: 10 });
+      } catch (e) {}
+      y -= 18;
+    }
+  }
+
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
   return {
@@ -310,8 +401,35 @@ export const clientWordToPdf = async (file: File): Promise<{ download_url: strin
   };
 };
 
-// 9. Client-side PDF to JPG
+// 9. Client-side PDF to JPG (Renders actual PDF page using pdfjs-dist onto canvas)
 export const clientPdfToJpg = async (file: File): Promise<{ download_url: string; filename: string }> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdfDoc = await loadingTask.promise;
+    const page = await pdfDoc.getPage(1);
+    const viewport = page.getViewport({ scale: 1.5 });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          resolve({
+            download_url: URL.createObjectURL(blob || new Blob()),
+            filename: `${file.name.replace(/\.[^/.]+$/, '')}_page_1.jpg`
+          });
+        }, 'image/jpeg', 0.92);
+      });
+    }
+  } catch (e) {
+    console.error("PDF to JPG render error:", e);
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = 800;
   canvas.height = 600;
@@ -320,11 +438,8 @@ export const clientPdfToJpg = async (file: File): Promise<{ download_url: string
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, 800, 600);
     ctx.fillStyle = '#1e293b';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(`PDF Page 1 - ${file.name}`, 60, 100);
-    ctx.font = '16px sans-serif';
-    ctx.fillStyle = '#64748b';
-    ctx.fillText('High-resolution converted image rendered by Pick Your Document', 60, 140);
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(`Document Preview - ${file.name}`, 60, 100);
   }
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {

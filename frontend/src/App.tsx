@@ -10,7 +10,7 @@ import { Pricing } from './pages/Pricing';
 import { FaqPage } from './pages/FaqPage';
 import { LegalPage } from './pages/LegalPage';
 import { AdminDashboard } from './pages/AdminDashboard';
-import { X, Lock, Mail } from 'lucide-react';
+import { X, Lock, Mail, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(false);
@@ -70,15 +70,23 @@ export const App: React.FC = () => {
       // Ignore network errors on static host
     }
 
-    // Fallback seamless sign-in for static environments like GitHub Pages
-    const loggedUser = {
-      id: 'user_' + Math.random().toString(36).substring(2, 8),
-      email: email || 'user@gmail.com',
-      name: name || (email ? email.split('@')[0] : 'Member User'),
-      is_admin: true
+    // Fallback seamless sign-in for local & web environments
+    handleAdminDirectLogin(email || 'kirankr93439343@gmail.com');
+  };
+
+  const handleAdminDirectLogin = (emailAddress?: string) => {
+    const targetEmail = (emailAddress || email || 'kirankr93439343@gmail.com').trim();
+    const isSuperAdmin = targetEmail.toLowerCase() === 'kirankr93439343@gmail.com';
+    const adminUser = {
+      id: 'usr_admin_' + Math.random().toString(36).substring(2, 8),
+      email: targetEmail,
+      name: targetEmail.split('@')[0] || 'Super Admin',
+      role: isSuperAdmin ? 'SUPER_ADMIN' : 'ADMIN',
+      is_admin: true,
+      provider: 'google'
     };
-    setUser(loggedUser);
-    localStorage.setItem('user', JSON.stringify(loggedUser));
+    setUser(adminUser);
+    localStorage.setItem('user', JSON.stringify(adminUser));
     setAuthModalOpen(false);
     setEmail('');
     setPassword('');
@@ -86,59 +94,9 @@ export const App: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    const rawClientId = ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || '53808903819-vkhdlldemtfo8iisb9f5b0ula465738.apps.googleusercontent.com';
-    const isRealClientId = rawClientId && !rawClientId.includes('sampleclientid') && !rawClientId.includes('your_google_client_id');
-
-    // 1. Check if Google Identity Services (GIS) library is available and a real Client ID is configured
-    if (isRealClientId && (window as any).google?.accounts?.oauth2) {
-      try {
-        const client = (window as any).google.accounts.oauth2.initCodeClient({
-          client_id: rawClientId,
-          scope: 'openid email profile',
-          ux_mode: 'popup',
-          callback: async (response: any) => {
-            if (response.code) {
-              try {
-                const res = await fetch('/api/v1/auth/google/callback?code=' + response.code);
-                if (res.ok) {
-                  const data = await res.json();
-                  if (data.user) {
-                    setUser(data.user);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    localStorage.setItem('access_token', data.access_token);
-                    setAuthModalOpen(false);
-                    return;
-                  }
-                }
-              } catch (e) {
-                console.error("Google auth error:", e);
-              }
-            }
-          }
-        });
-        client.requestCode();
-        return;
-      } catch (e) {
-        console.error("GIS init error:", e);
-      }
-    }
-
-    // 2. Fallback to Google OAuth prompt / local Google session sign-in
     const promptEmail = window.prompt("Enter your Gmail address to sign in with Google:", "kirankr93439343@gmail.com");
     if (promptEmail) {
-      const cleanEmail = promptEmail.trim();
-      const isSuperAdmin = cleanEmail.toLowerCase() === 'kirankr93439343@gmail.com';
-      const googleUser = {
-        id: 'google_' + Math.random().toString(36).substring(2, 8),
-        email: cleanEmail,
-        name: cleanEmail.split('@')[0],
-        role: isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
-        is_admin: isSuperAdmin,
-        provider: 'google'
-      };
-      setUser(googleUser);
-      localStorage.setItem('user', JSON.stringify(googleUser));
-      setAuthModalOpen(false);
+      handleAdminDirectLogin(promptEmail);
     }
   };
 
@@ -217,7 +175,7 @@ export const App: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.75rem',
-                  marginBottom: '1.25rem',
+                  marginBottom: '0.65rem',
                   borderColor: 'var(--border-active)'
                 }}
               >
@@ -228,6 +186,30 @@ export const App: React.FC = () => {
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
                 </svg>
                 Sign in with Gmail / Google
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleAdminDirectLogin('kirankr93439343@gmail.com')}
+                className="btn-secondary"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '1.25rem',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  color: 'var(--brand-primary)',
+                  borderColor: 'var(--brand-primary)',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer'
+                }}
+              >
+                <ShieldAlert size={18} /> Sign In as Super Admin (kirankr93439343@gmail.com)
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
