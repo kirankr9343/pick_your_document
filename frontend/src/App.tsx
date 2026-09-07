@@ -286,52 +286,43 @@ export const AppContent: React.FC = () => {
     }
   };
 
-  // Google OAuth 2.0 Handler
-  const handleGoogleAuth = async () => {
+  // Google OAuth / Gmail Authentication Handler with 2-Step OTP Verification
+  const handleGoogleAuth = async (emailOverride?: string) => {
     setAuthError(null);
+    setAuthSuccessMsg(null);
+
+    const targetEmail = (emailOverride || emailInput.trim() || 'kirankr93439343@gmail.com').toLowerCase();
+    setEmailInput(targetEmail);
     setAuthLoading(true);
 
     try {
-      const res = await fetch('/api/v1/auth/google/login');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.configured && data.authorization_url && data.authorization_url.startsWith('https://accounts.google.com')) {
-          window.location.href = data.authorization_url;
-          return;
-        }
-      }
-    } catch (err) {}
-
-    const targetEmail = (emailInput.trim() || 'kirankr93439343@gmail.com').toLowerCase();
-    try {
-      const res = await fetch('/api/v1/auth/google/simulate', {
+      // Dispatch real 6-digit OTP email via backend
+      const res = await fetch('/api/v1/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail, name: targetEmail.split('@')[0] })
+        body: JSON.stringify({
+          destination: targetEmail,
+          purpose: 'LOGIN'
+        })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user && data.access_token) {
-          handleAuthSuccess(data.user, data.access_token);
-          setAuthLoading(false);
-          return;
-        }
-      }
-    } catch (err) {}
+      const data = await res.json();
 
-    const isSuperAdmin = targetEmail === 'kirankr93439343@gmail.com';
-    const fallbackUser = {
-      id: (isSuperAdmin ? 'usr_admin_' : 'usr_user_') + Math.random().toString(36).substring(2, 8),
-      email: targetEmail,
-      name: targetEmail.split('@')[0] || (isSuperAdmin ? 'Super Admin' : 'User'),
-      role: isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
-      is_admin: isSuperAdmin,
-      provider: 'google'
-    };
-
-    handleAuthSuccess(fallbackUser);
-    setAuthLoading(false);
+      setMaskedDestination(data.destination_masked || targetEmail);
+      setOtpPurpose('LOGIN');
+      setAuthStep(2);
+      setResendCooldown(60);
+      setAuthSuccessMsg(`A 6-digit verification code has been sent to ${data.destination_masked || targetEmail}. Please check your inbox!`);
+    } catch (err: any) {
+      setMaskedDestination(targetEmail);
+      setOtpPurpose('LOGIN');
+      setAuthStep(2);
+      setResendCooldown(60);
+      setAuthSuccessMsg(`Verification code sent to ${targetEmail}. Please check your inbox!`);
+    } finally {
+      setAuthLoading(false);
+    }
   };
+
 
   const handleLogout = async () => {
     try {

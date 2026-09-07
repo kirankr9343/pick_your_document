@@ -32,7 +32,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const receiverUpiId = 'kirankr93439343@upi';
   const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=PickYourDocument&am=${amountInr}&cu=INR&tn=${encodeURIComponent(planName)}`;
-  const qrCodeImageUrl = 'assets/gpay-qr.png';
+  const baseUrl = (import.meta as any).env?.BASE_URL || '/';
+  const qrCodeImageUrl = `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}assets/gpay-qr.png`;
+  const fallbackQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiPayString)}`;
+
+
 
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(receiverUpiId);
@@ -334,15 +338,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     
                     <img
                       src={qrCodeImageUrl}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = fallbackQrUrl;
+                      }}
                       alt="UPI Payment QR Code"
                       style={{
                         width: '180px',
                         height: '180px',
                         margin: '0 auto 0.75rem auto',
                         borderRadius: '8px',
-                        border: '1px solid #e2e8f0'
+                        border: '1px solid #e2e8f0',
+                        objectFit: 'contain'
                       }}
                     />
+
 
                     <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.5rem' }}>
                       Amount: ₹{amountInr} INR
