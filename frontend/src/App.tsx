@@ -86,7 +86,7 @@ export const App: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    const rawClientId = ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || '';
+    const rawClientId = ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || '53808903819-vkhdlldemtfo8iisb9f5b0ula465738.apps.googleusercontent.com';
     const isRealClientId = rawClientId && !rawClientId.includes('sampleclientid') && !rawClientId.includes('your_google_client_id');
 
     // 1. Check if Google Identity Services (GIS) library is available and a real Client ID is configured

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./pick_your_document.db"
 
-    # Google OAuth 2.0
+    # Google OAuth 2.0 (Loaded automatically from backend/.env)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
