@@ -321,18 +321,30 @@ export const AppContent: React.FC = () => {
     setAuthError(null);
     setAuthSuccessMsg(null);
 
-    // If no email override and no input provided, launch official Google Account Chooser page!
-    if (!emailOverride && !emailInput.trim()) {
-      const googleClientId = "53808903819-vkhdlldemtfo8iisb9f5b0ula465738.apps.googleusercontent.com";
-      const redirectUri = window.location.origin + window.location.pathname;
-      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        `client_id=${encodeURIComponent(googleClientId)}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&response_type=token` +
-        `&scope=${encodeURIComponent('openid email profile')}` +
-        `&prompt=select_account`;
+    const googleClientId = ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string) || "";
 
-      window.location.href = googleAuthUrl;
+    // If no email override and no input provided
+    if (!emailOverride && !emailInput.trim()) {
+      // If a valid Google Client ID is configured in env (must end with .apps.googleusercontent.com and not be a placeholder)
+      if (googleClientId && googleClientId.includes('.apps.googleusercontent.com') && !googleClientId.includes('YOUR_')) {
+        const redirectUri = window.location.origin + window.location.pathname;
+        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+          `client_id=${encodeURIComponent(googleClientId)}` +
+          `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+          `&response_type=token` +
+          `&scope=${encodeURIComponent('openid email profile')}` +
+          `&prompt=select_account`;
+
+        window.location.href = googleAuthUrl;
+        return;
+      }
+
+      // If no valid client ID configured, prompt user to enter their Google/Gmail email directly
+      setAuthError("Please enter your Google / Gmail email address above to receive your 6-digit verification code.");
+      const emailElem = document.getElementById('auth-email-input');
+      if (emailElem) {
+        emailElem.focus();
+      }
       return;
     }
 
@@ -557,6 +569,7 @@ export const AppContent: React.FC = () => {
                   </label>
                   <div style={{ position: 'relative' }}>
                     <input
+                      id="auth-email-input"
                       type="email"
                       required
                       placeholder="user@example.com or kirankr93439343@gmail.com"
