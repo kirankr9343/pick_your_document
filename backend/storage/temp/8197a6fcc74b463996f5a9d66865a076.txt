@@ -1,0 +1,5 @@
+OCR Processing Result for 'ed49827d42b74cc395414282e688d51b.png':
+
+Image Dimensions: 600x300 px, Format: PNG, Mode: RGB.
+
+[Note: Tesseract OCR binary was not detected on the host system. When running inside the production Docker container, full Tesseract engine is automatically active.]
