@@ -28,6 +28,8 @@ ENV/
 *.db
 *.sqlite
 *.sqlite3
+backend/storage/temp/*
+!backend/storage/temp/.gitkeep
 storage/temp/*
 !storage/temp/.gitkeep
 

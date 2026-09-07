@@ -1,6 +1,0 @@
---- Page 1 ---
-
-Pick Your Document - Sample Single Page PDF
-This synthetic PDF document contains sample text for testing PDF to Word, PDF to Text, Compress
-PDF, and AI Summarization.
-Key Point: All conversion functions must process clean data accurately without data corruption.

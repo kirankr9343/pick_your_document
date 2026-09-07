@@ -7,7 +7,20 @@ import { ResultCard } from '../components/tools/ResultCard';
 import { EditableTextArea } from '../components/tools/EditableTextArea';
 import { AiSummaryDisplay } from '../components/tools/AiSummaryDisplay';
 import { AdBanner } from '../components/ads/AdBanner';
-import { AlertTriangle, ChevronRight, HelpCircle, FileText } from 'lucide-react';
+import { AlertTriangle, ChevronRight, HelpCircle } from 'lucide-react';
+
+import {
+  clientMergePdf,
+  clientSplitPdf,
+  clientImageToPdf,
+  clientImageToText,
+  clientCompressPdf,
+  clientPdfToText,
+  clientPdfToWord,
+  clientWordToPdf,
+  clientPdfToJpg,
+  clientPdfSummary
+} from '../lib/clientConverters';
 
 export const ToolRunner: React.FC = () => {
   const { toolId } = useParams<{ toolId: string }>();
@@ -59,36 +72,108 @@ export const ToolRunner: React.FC = () => {
     }
 
     try {
-      const response = await fetch(tool.apiEndpoint, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        const msg = data.detail?.message || data.message || "We couldn't process this document. It may be damaged or password-protected.";
-        throw new Error(msg);
-      }
-
-      setDownloadUrl(data.download_url);
-
-      if (tool.id === 'image-to-text' && data.extracted_text !== undefined) {
-        setOcrText(data.extracted_text);
-        setOcrWordCount(data.word_count || 0);
-      }
-
-      if (tool.id === 'pdf-summary' && data.summary_data) {
-        setAiData(data.summary_data);
-      }
-
-      if (tool.id === 'compress-pdf' && data.percentage_saved !== undefined) {
-        setCompressionStats({
-          original_size: data.original_size,
-          compressed_size: data.compressed_size,
-          saved_bytes: data.saved_bytes,
-          percentage_saved: data.percentage_saved
+      // 1. Try Backend API call first
+      let apiSuccess = false;
+      try {
+        const response = await fetch(tool.apiEndpoint, {
+          method: 'POST',
+          body: formData,
         });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          const data = await response.json();
+          if (data.success) {
+            setDownloadUrl(data.download_url);
+            if (tool.id === 'image-to-text' && data.extracted_text !== undefined) {
+              setOcrText(data.extracted_text);
+              setOcrWordCount(data.word_count || 0);
+            }
+            if (tool.id === 'pdf-summary' && data.summary_data) {
+              setAiData(data.summary_data);
+            }
+            if (tool.id === 'compress-pdf' && data.percentage_saved !== undefined) {
+              setCompressionStats({
+                original_size: data.original_size,
+                compressed_size: data.compressed_size,
+                saved_bytes: data.saved_bytes,
+                percentage_saved: data.percentage_saved
+              });
+            }
+            apiSuccess = true;
+          }
+        }
+      } catch (backendErr) {
+        // Backend not available or running on static host like GitHub Pages
+      }
+
+      // 2. Client-side fallback if backend call wasn't available
+      if (!apiSuccess) {
+        const primaryFile = selectedFiles[0];
+
+        switch (tool.id) {
+          case 'merge-pdf': {
+            const res = await clientMergePdf(selectedFiles);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'split-pdf': {
+            const res = await clientSplitPdf(primaryFile, pageRanges);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'image-to-pdf': {
+            const res = await clientImageToPdf(selectedFiles);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'image-to-text': {
+            const res = await clientImageToText(primaryFile);
+            setOcrText(res.extracted_text);
+            setOcrWordCount(res.word_count);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'compress-pdf': {
+            const res = await clientCompressPdf(primaryFile);
+            setDownloadUrl(res.download_url);
+            setCompressionStats({
+              original_size: res.original_size,
+              compressed_size: res.compressed_size,
+              saved_bytes: res.saved_bytes,
+              percentage_saved: res.percentage_saved
+            });
+            break;
+          }
+          case 'pdf-to-text': {
+            const res = await clientPdfToText(primaryFile);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'pdf-to-word': {
+            const res = await clientPdfToWord(primaryFile);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'word-to-pdf': {
+            const res = await clientWordToPdf(primaryFile);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'pdf-to-jpg': {
+            const res = await clientPdfToJpg(primaryFile);
+            setDownloadUrl(res.download_url);
+            break;
+          }
+          case 'pdf-summary': {
+            const res = await clientPdfSummary(primaryFile);
+            setAiData(res.summary_data);
+            setDownloadUrl(URL.createObjectURL(new Blob([JSON.stringify(res.summary_data, null, 2)], { type: 'application/json' })));
+            break;
+          }
+          default:
+            throw new Error(`Tool '${tool.id}' engine processing fallback not configured.`);
+        }
       }
 
       setStatus('success');
@@ -195,7 +280,7 @@ export const ToolRunner: React.FC = () => {
         )}
       </div>
 
-      <AdBanner />
+      <AdBanner slot="below-tool-runner" />
 
       {/* RICH SEO CONTENT SECTION BELOW TOOL */}
       <section style={{
@@ -241,7 +326,7 @@ export const ToolRunner: React.FC = () => {
               <li key={idx}>{lim}</li>
             ))}
             <li>Maximum uploaded file size limit: 50MB per request.</li>
-            <li>All files automatically expire and are purged from temporary server memory after processing.</li>
+            <li>All files automatically expire and are purged from temporary memory after processing.</li>
           </ul>
         </div>
 
