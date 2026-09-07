@@ -1,6 +1,7 @@
 import os
 import asyncio
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import init_db
@@ -59,15 +60,40 @@ def test_pdf_summary_api():
         assert "summary_data" in data
         assert "summary" in data["summary_data"]
 
-def test_auth_register_and_login():
+def test_auth_register_and_login_with_otp():
     email = f"testuser_{os.urandom(4).hex()}@example.com"
     payload = {"email": email, "password": "securepassword123", "name": "Test User"}
-    with TestClient(app) as client:
-        reg_res = client.post("/api/v1/auth/register", json=payload)
-        assert reg_res.status_code == 200
-        data = reg_res.json()
-        assert "access_token" in data
+    
+    with patch("app.services.otp_service.generate_secure_otp", return_value="654321"):
+        with TestClient(app) as client:
+            # Step 1: Register credentials
+            reg_res = client.post("/api/v1/auth/register", json=payload)
+            assert reg_res.status_code == 200
+            reg_data = reg_res.json()
+            assert reg_data["otp_required"] is True
 
-        login_res = client.post("/api/v1/auth/login", json={"email": email, "password": "securepassword123"})
-        assert login_res.status_code == 200
-        assert "access_token" in login_res.json()
+            # Step 2: Verify Registration OTP
+            verify_reg = client.post("/api/v1/auth/verify-otp", json={
+                "destination": email,
+                "otp": "654321",
+                "purpose": "SIGNUP"
+            })
+            assert verify_reg.status_code == 200
+            token_data = verify_reg.json()
+            assert "access_token" in token_data
+            assert token_data["user"]["email"] == email
+
+            # Step 3: Login credentials
+            login_res = client.post("/api/v1/auth/login", json={"email": email, "password": "securepassword123"})
+            assert login_res.status_code == 200
+            login_data = login_res.json()
+            assert login_data["otp_required"] is True
+
+            # Step 4: Verify Login OTP
+            verify_login = client.post("/api/v1/auth/verify-otp", json={
+                "destination": email,
+                "otp": "654321",
+                "purpose": "LOGIN"
+            })
+            assert verify_login.status_code == 200
+            assert "access_token" in verify_login.json()
