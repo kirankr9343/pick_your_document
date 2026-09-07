@@ -66,8 +66,10 @@ class UserLogin(BaseModel):
 
 class UserResponse(BaseModel):
     id: str
+    google_subject_id: Optional[str] = None
     email: str
     name: Optional[str] = None
+    profile_image_url: Optional[str] = None
     role: str = "USER"
     status: str = "active"
     is_admin: bool

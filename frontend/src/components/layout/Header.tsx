@@ -91,6 +91,12 @@ export const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode, onOpenAut
             About
           </Link>
           
+          {user && (
+            <Link to="/dashboard" style={{ fontWeight: 600, fontSize: '0.925rem', color: 'var(--brand-primary)' }}>
+              Dashboard
+            </Link>
+          )}
+
           {(user?.is_admin || user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.email?.toLowerCase() === 'kirankr93439343@gmail.com') && (
             <Link
               to="/admin"
@@ -130,7 +136,12 @@ export const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode, onOpenAut
           {/* User Auth */}
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{user.name}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700 }}>{user.name}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  Account Role: {user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.is_admin ? 'Administrator' : 'User'}
+                </span>
+              </div>
               <button onClick={onLogout} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
                 Logout
               </button>

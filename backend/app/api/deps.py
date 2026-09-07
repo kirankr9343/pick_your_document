@@ -13,15 +13,19 @@ from app.core.database import get_db
 from app.core.security import validate_file_security, generate_random_storage_path, decode_access_token
 from app.models.models import User, ProcessingJob, UsageRecord, ToolStatus
 
+from fastapi import UploadFile, HTTPException, status, Depends, Cookie
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
+    access_token_cookie: Optional[str] = Cookie(None, alias="access_token"),
     db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
-    if not token:
+    auth_token = token or access_token_cookie
+    if not auth_token:
         return None
-    payload = decode_access_token(token)
+    payload = decode_access_token(auth_token)
     if not payload or "sub" not in payload:
         return None
     user_id = payload["sub"]

@@ -11,9 +11,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
+    google_subject_id = Column(String(255), nullable=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     name = Column(String(255), nullable=True)
+    profile_image_url = Column(String(500), nullable=True)
     role = Column(String(20), default="USER", nullable=False, index=True)  # USER, ADMIN, SUPER_ADMIN
     status = Column(String(20), default="active", nullable=False, index=True)  # active, disabled
     is_active = Column(Boolean, default=True)
