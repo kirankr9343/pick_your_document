@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./pick_your_document.db"
 
+    # Google OAuth 2.0
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+
     # Rate Limits
     ANONYMOUS_REQUESTS_PER_HOUR: int = 60
     AUTHENTICATED_REQUESTS_PER_HOUR: int = 300
