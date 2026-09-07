@@ -40,12 +40,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const [utrError, setUtrError] = useState<string | null>(null);
+
   const handlePayNow = (e: React.FormEvent) => {
     e.preventDefault();
+    setUtrError(null);
+
+    const cleanUtr = utrNumber.trim();
+    if (!cleanUtr || cleanUtr.length < 10) {
+      setUtrError("Payment verification requires a valid 12-digit UTR / Bank Reference Number from your payment app (Google Pay / PhonePe / Paytm).");
+      return;
+    }
+
     setProcessing(true);
 
     setTimeout(() => {
-      const transactionId = utrNumber.trim() || ('PAY_INR_' + Math.random().toString(36).substring(2, 10).toUpperCase());
+      const transactionId = cleanUtr;
       const receiptDetails = {
         transaction_id: transactionId,
         amount: amountInr,
@@ -386,11 +396,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                   {/* UTR / Transaction Reference Verification Field */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                      Enter 12-Digit UTR / Transaction Reference ID (Optional)
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
+                      Enter 12-Digit UTR / Bank Reference Number <span style={{ color: '#ef4444' }}>* (Required)</span>
                     </label>
                     <input
                       type="text"
+                      required
                       placeholder="e.g. 429184920194"
                       value={utrNumber}
                       onChange={(e) => setUtrNumber(e.target.value)}
@@ -398,13 +409,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         width: '100%',
                         padding: '0.75rem',
                         borderRadius: 'var(--radius-md)',
-                        border: '1px solid var(--border-subtle)',
+                        border: '2px solid var(--brand-primary)',
                         background: 'var(--bg-primary)',
                         color: 'var(--text-primary)',
-                        fontSize: '0.9rem',
-                        fontFamily: 'monospace'
+                        fontSize: '0.95rem',
+                        fontFamily: 'monospace',
+                        outline: 'none'
                       }}
                     />
+                    {utrError && (
+                      <div style={{ color: '#ef4444', fontSize: '0.825rem', marginTop: '0.4rem', fontWeight: 600 }}>
+                        ⚠️ {utrError}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

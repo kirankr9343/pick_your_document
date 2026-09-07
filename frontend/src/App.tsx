@@ -213,7 +213,7 @@ export const App: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.75rem',
-                  marginBottom: '0.65rem',
+                  marginBottom: '1.25rem',
                   borderColor: 'var(--border-active)'
                 }}
               >
@@ -226,33 +226,9 @@ export const App: React.FC = () => {
                 Sign in with Gmail / Google
               </button>
 
-              <button
-                type="button"
-                onClick={() => handleAdminDirectLogin('kirankr93439343@gmail.com')}
-                className="btn-secondary"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  fontSize: '0.875rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '1.25rem',
-                  background: 'rgba(59, 130, 246, 0.12)',
-                  color: 'var(--brand-primary)',
-                  borderColor: 'var(--brand-primary)',
-                  fontWeight: 700,
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer'
-                }}
-              >
-                <ShieldAlert size={18} /> Sign In as Super Admin (kirankr93439343@gmail.com)
-              </button>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
                 <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>or email</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>or email otp</span>
                 <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
               </div>
 
@@ -284,7 +260,7 @@ export const App: React.FC = () => {
                   fontWeight: 600
                 }}>
                   📩 OTP Sent to <strong>{email}</strong>!<br />
-                  <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>Verification Code: {generatedOtp}</span>
+                  <span style={{ fontSize: '0.825rem', fontWeight: 500 }}>Please check your Gmail inbox / device for your 6-digit verification code.</span>
                 </div>
               )}
 
