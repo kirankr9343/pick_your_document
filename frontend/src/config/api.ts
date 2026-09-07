@@ -6,13 +6,8 @@ const getEnvApiUrl = (): string => {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return ''; // Use relative /api proxy configured in vite.config.ts
-  }
-
-  // Fallback production backend URL
-  return 'https://pick-your-document-backend.onrender.com';
+  // On Vercel, localhost, and single-domain hosting, relative /api paths work natively via vercel.json rewrites & Vite proxy
+  return '';
 };
 
 export const API_BASE_URL = getEnvApiUrl();
