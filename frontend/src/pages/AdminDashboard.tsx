@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, HardDrive,
   Clock, Activity, Search, Filter, Lock, Power, RefreshCw, BarChart2,
-  FileCheck, Shield, ChevronLeft, ChevronRight, Settings, ListFilter, AlertCircle, UserCheck, UserX
+  FileCheck, Shield, ChevronLeft, ChevronRight, Settings, ListFilter, AlertCircle, UserCheck, UserX, CreditCard
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -11,7 +11,60 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'jobs' | 'tools' | 'analytics' | 'errors' | 'system' | 'audit' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'payments' | 'users' | 'jobs' | 'tools' | 'analytics' | 'errors' | 'system' | 'audit' | 'settings'>('dashboard');
+
+  // Pending UTR Payments State
+  const [pendingPayments, setPendingPayments] = useState<any[]>([]);
+
+  const loadPendingPayments = () => {
+    try {
+      const stored = localStorage.getItem('pending_utr_payments');
+      if (stored) {
+        setPendingPayments(JSON.parse(stored));
+      } else {
+        setPendingPayments([]);
+      }
+    } catch (e) {
+      setPendingPayments([]);
+    }
+  };
+
+  useEffect(() => {
+    loadPendingPayments();
+  }, [activeTab]);
+
+  const handleApprovePayment = (paymentId: string) => {
+    const updated = pendingPayments.map(p => {
+      if (p.id === paymentId) {
+        return { ...p, status: 'APPROVED', approved_at: new Date().toISOString() };
+      }
+      return p;
+    });
+    setPendingPayments(updated);
+    localStorage.setItem('pending_utr_payments', JSON.stringify(updated));
+
+    const targetPayment = pendingPayments.find(p => p.id === paymentId);
+    if (targetPayment) {
+      const currentUserObj = JSON.parse(localStorage.getItem('user') || '{}');
+      if (currentUserObj.email === targetPayment.user_email) {
+        const updatedUser = { ...currentUserObj, is_pro: true, plan: targetPayment.plan };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+      showToast(`Payment Approved! Pro plan activated for ${targetPayment.user_email || 'user'}.`, 'success');
+    }
+  };
+
+  const handleRejectPayment = (paymentId: string) => {
+    const updated = pendingPayments.map(p => {
+      if (p.id === paymentId) {
+        return { ...p, status: 'REJECTED', rejected_at: new Date().toISOString() };
+      }
+      return p;
+    });
+    setPendingPayments(updated);
+    localStorage.setItem('pending_utr_payments', JSON.stringify(updated));
+    showToast('UTR Payment submission rejected.', 'error');
+  };
 
   // Dashboard Stats State
   const [metrics, setMetrics] = useState<any>(null);
@@ -372,6 +425,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: currentUse
 
         {[
           { id: 'dashboard', label: 'Dashboard Overview', icon: Activity },
+          { id: 'payments', label: 'UTR Payment Approvals', icon: CreditCard },
           { id: 'users', label: 'User Accounts', icon: Users },
           { id: 'jobs', label: 'Processing Jobs', icon: FileText },
           { id: 'tools', label: 'Tool Management', icon: Power },
@@ -485,6 +539,98 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: currentUse
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No conversion records in database yet.</p>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 1.5 UTR PAYMENT APPROVALS TAB */}
+        {activeTab === 'payments' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.25rem' }}>UTR Payment Verification & Pro Approvals</h1>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  Verify user-submitted 12-digit UTR payment references against bank records before granting Pro subscription status
+                </p>
+              </div>
+              <button onClick={loadPendingPayments} className="btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <RefreshCw size={14} /> Refresh Submissions
+              </button>
+            </div>
+
+            <div className="glass-card" style={{ overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>12-Digit UTR Number</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>User Email</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Plan / Amount</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Status</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Submitted At</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700, textAlign: 'right' }}>Admin Verification</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingPayments.length > 0 ? (
+                    pendingPayments.map((p) => (
+                      <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td style={{ padding: '0.85rem 1rem', fontFamily: 'monospace', fontWeight: 800, color: 'var(--brand-primary)' }}>
+                          {p.transaction_id}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>{p.user_email}</td>
+                        <td style={{ padding: '0.85rem 1rem' }}>
+                          <strong style={{ color: '#10b981' }}>₹{p.amount} INR</strong> ({p.plan})
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem' }}>
+                          <span style={{
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '999px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            background: p.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.15)' : p.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                            color: p.status === 'APPROVED' ? '#10b981' : p.status === 'REJECTED' ? '#ef4444' : '#eab308'
+                          }}>
+                            {p.status === 'APPROVED' ? '✅ APPROVED & ACTIVE' : p.status === 'REJECTED' ? '❌ REJECTED' : '⏳ PENDING ADMIN VERIFICATION'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                          {p.timestamp}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                          {p.status === 'APPROVED' ? (
+                            <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.8rem' }}>Pro Active</span>
+                          ) : p.status === 'REJECTED' ? (
+                            <span style={{ color: '#ef4444', fontWeight: 700, fontSize: '0.8rem' }}>Rejected</span>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={() => handleApprovePayment(p.id)}
+                                className="btn-primary"
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: '#10b981', borderColor: '#10b981' }}
+                              >
+                                ✅ Approve & Activate Pro
+                              </button>
+                              <button
+                                onClick={() => handleRejectPayment(p.id)}
+                                className="btn-secondary"
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
+                              >
+                                ❌ Reject UTR
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No pending UTR payment submissions found. When users submit 12-digit UTR bank references from UPI QR payment, they will appear here for your verification.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

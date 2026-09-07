@@ -56,25 +56,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     setTimeout(() => {
       const transactionId = cleanUtr;
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const receiptDetails = {
+        id: 'PAY_' + Math.random().toString(36).substring(2, 8).toUpperCase(),
         transaction_id: transactionId,
         amount: amountInr,
         currency: 'INR (₹)',
         payee_upi: receiverUpiId,
         method: selectedMethod.toUpperCase(),
         plan: planName,
+        user_email: currentUser.email || 'user@gmail.com',
         timestamp: new Date().toLocaleString(),
-        status: 'SUCCESS'
+        status: 'PENDING_ADMIN_VERIFICATION'
       };
+
+      // Save to pending payments registry for Admin Dashboard approval
+      try {
+        const existingPayments = JSON.parse(localStorage.getItem('pending_utr_payments') || '[]');
+        existingPayments.unshift(receiptDetails);
+        localStorage.setItem('pending_utr_payments', JSON.stringify(existingPayments));
+      } catch (e) {}
 
       setProcessing(false);
       setPaymentSuccess(receiptDetails);
-
-      // Save Pro status in local storage
-      const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
-      savedUser.plan = 'PRO';
-      savedUser.pro_active = true;
-      localStorage.setItem('user', JSON.stringify(savedUser));
 
       if (onSuccess) {
         onSuccess(receiptDetails);
@@ -126,25 +130,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </div>
 
         {paymentSuccess ? (
-          /* Payment Success Confirmation */
+          /* Payment Pending Admin Verification Confirmation */
           <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
             <div style={{
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              background: 'rgba(16, 185, 129, 0.15)',
-              color: '#10b981',
+              background: 'rgba(234, 179, 8, 0.15)',
+              color: '#eab308',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 1rem auto'
             }}>
-              <CheckCircle2 size={40} />
+              <Sparkles size={36} />
             </div>
 
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Payment Verified & Confirmed!</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
-              Your subscription to <strong>{paymentSuccess.plan}</strong> is now active.
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.5rem' }}>UTR Submitted for Verification!</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.925rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+              Your transaction reference <strong>{paymentSuccess.transaction_id}</strong> has been submitted to Admin (<strong>kirankr93439343@gmail.com</strong>) for bank verification. Pro status will be activated upon bank receipt confirmation.
             </p>
 
             <div style={{
@@ -160,11 +164,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               border: '1px solid var(--border-subtle)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Transaction Reference / UTR:</span>
+                <span style={{ color: 'var(--text-muted)' }}>UTR Reference Number:</span>
                 <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--brand-primary)' }}>{paymentSuccess.transaction_id}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Amount Credited:</span>
+                <span style={{ color: 'var(--text-muted)' }}>Amount Paid:</span>
                 <span style={{ fontWeight: 800, color: '#10b981' }}>₹{paymentSuccess.amount} INR</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -172,13 +176,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span style={{ fontWeight: 600 }}>{paymentSuccess.payee_upi}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Date & Time:</span>
-                <span>{paymentSuccess.timestamp}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+                <span style={{ fontWeight: 700, color: '#eab308' }}>⏳ Pending Admin Verification</span>
               </div>
             </div>
 
             <button onClick={onClose} className="btn-primary" style={{ width: '100%', padding: '0.85rem' }}>
-              Back to Dashboard
+              Close & Return to Site
             </button>
           </div>
         ) : (
