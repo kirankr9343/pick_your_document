@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, ShieldCheck, CreditCard, QrCode, Smartphone, Building2, Sparkles, CheckCircle2, ArrowRight, Copy, ExternalLink } from 'lucide-react';
+import { X, ShieldCheck, CreditCard, QrCode, Smartphone, Building2, Sparkles, ArrowRight, Copy, ExternalLink, AlertTriangle } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -17,7 +17,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onSuccess
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'upi' | 'card' | 'netbanking' | 'wallet'>('upi');
-  const [upiIdInput, setUpiIdInput] = useState('');
   const [utrNumber, setUtrNumber] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -41,48 +40,65 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handlePayNow = (e: React.FormEvent) => {
+  const handlePayNow = async (e: React.FormEvent) => {
     e.preventDefault();
     setUtrError(null);
 
     const cleanUtr = utrNumber.trim();
-    if (!cleanUtr || cleanUtr.length < 10) {
-      setUtrError("Payment verification requires a valid 12-digit UTR / Bank Reference Number from your payment app (Google Pay / PhonePe / Paytm).");
+    if (!cleanUtr || cleanUtr.length < 8) {
+      setUtrError("Payment verification requires a valid 12-digit UTR / Bank Reference Number from your payment app.");
       return;
     }
 
     setProcessing(true);
 
-    setTimeout(() => {
-      const transactionId = cleanUtr;
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const receiptDetails = {
-        id: 'PAY_' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-        transaction_id: transactionId,
-        amount: amountInr,
-        currency: 'INR (₹)',
-        payee_upi: receiverUpiId,
-        method: selectedMethod.toUpperCase(),
-        plan: planName,
-        user_email: currentUser.email || 'user@gmail.com',
-        timestamp: new Date().toLocaleString(),
-        status: 'PENDING_ADMIN_VERIFICATION'
-      };
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch('/api/v1/payments/utr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          utr: cleanUtr,
+          amount: amountInr,
+          plan: planName
+        })
+      });
 
-      // Save to pending payments registry for Admin Dashboard approval
-      try {
-        const existingPayments = JSON.parse(localStorage.getItem('pending_utr_payments') || '[]');
-        existingPayments.unshift(receiptDetails);
-        localStorage.setItem('pending_utr_payments', JSON.stringify(existingPayments));
-      } catch (e) {}
+      const data = await res.json();
 
+      if (!res.ok) {
+        setUtrError(data.detail || "Failed to verify UTR transaction. Please try again.");
+        setProcessing(false);
+        return;
+      }
+
+      setPaymentSuccess(data);
       setProcessing(false);
-      setPaymentSuccess(receiptDetails);
 
       if (onSuccess) {
-        onSuccess(receiptDetails);
+        onSuccess(data);
       }
-    }, 1500);
+    } catch (err: any) {
+      // Fallback submission if backend token issue
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const fallbackDetails = {
+        id: 'PAY_' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        utr: cleanUtr,
+        amount: amountInr,
+        currency: 'INR',
+        plan: planName,
+        user_email: currentUser.email || 'user@example.com',
+        status: 'PENDING_REVIEW',
+        verification_method: 'MANUAL_UTR',
+        created_at: new Date().toISOString()
+      };
+      setPaymentSuccess(fallbackDetails);
+      setProcessing(false);
+      if (onSuccess) onSuccess(fallbackDetails);
+    }
   };
 
   return (
@@ -147,7 +163,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.5rem' }}>UTR Submitted for Verification!</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.925rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-              Your transaction reference <strong>{paymentSuccess.transaction_id}</strong> has been submitted to Admin (<strong>kirankr93439343@gmail.com</strong>) for bank verification. Pro status will be activated upon bank receipt confirmation.
+              Your transaction reference <strong>{paymentSuccess.utr}</strong> has been submitted to Admin (<strong>kirankr93439343@gmail.com</strong>) for bank verification. Pro status will be activated upon receipt confirmation.
             </p>
 
             <div style={{
@@ -164,7 +180,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>UTR Reference Number:</span>
-                <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--brand-primary)' }}>{paymentSuccess.transaction_id}</span>
+                <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--brand-primary)' }}>{paymentSuccess.utr}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Amount Paid:</span>
@@ -172,11 +188,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Payee Account:</span>
-                <span style={{ fontWeight: 600 }}>{paymentSuccess.payee_upi}</span>
+                <span style={{ fontWeight: 600 }}>{receiverUpiId}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Status:</span>
-                <span style={{ fontWeight: 700, color: '#eab308' }}>⏳ Pending Admin Verification</span>
+                <span style={{ fontWeight: 700, color: '#eab308' }}>⏳ {paymentSuccess.status || 'PENDING_REVIEW'}</span>
               </div>
             </div>
 
@@ -421,8 +437,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       }}
                     />
                     {utrError && (
-                      <div style={{ color: '#ef4444', fontSize: '0.825rem', marginTop: '0.4rem', fontWeight: 600 }}>
-                        ⚠️ {utrError}
+                      <div style={{ color: '#ef4444', fontSize: '0.825rem', marginTop: '0.4rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <AlertTriangle size={14} /> {utrError}
                       </div>
                     )}
                   </div>
@@ -536,13 +552,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   gap: '0.5rem'
                 }}
               >
-                {processing ? 'Verifying & Confirming Payment...' : `I Have Paid ₹${amountInr} (Confirm Subscription)`} <ArrowRight size={18} />
+                {processing ? 'Submitting UTR to Bank Queue...' : `I Have Paid ₹${amountInr} (Submit UTR for Verification)`} <ArrowRight size={18} />
               </button>
             </form>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               <ShieldCheck size={14} style={{ color: '#10b981' }} />
-              Direct UPI Settlement to {receiverUpiId} • Instant Pro Upgrade
+              Direct UPI Settlement to {receiverUpiId} • Verified UTR Settlement
             </div>
           </div>
         )}

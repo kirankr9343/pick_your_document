@@ -146,3 +146,42 @@ class AdminDashboardMetrics(BaseModel):
     active_jobs: int
     expired_files_count: int
     top_tools: List[Dict[str, Any]]
+
+# OTP & Authentication Flow Schemas
+class VerifyOtpRequest(BaseModel):
+    destination: str = Field(..., description="User email or phone number")
+    purpose: str = Field(..., description="SIGNUP, LOGIN, PASSWORD_RESET, EMAIL_VERIFICATION")
+    otp: str = Field(..., min_length=6, max_length=6)
+
+class ResendOtpRequest(BaseModel):
+    destination: str
+    purpose: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str = Field(..., min_length=6)
+
+# Payment & UTR Schemas
+class UtrPaymentRequest(BaseModel):
+    utr: str = Field(..., min_length=8, description="12-Digit Bank UTR / Reference Number")
+    amount: float = Field(..., gt=0)
+    plan: str = "Pro Plan"
+
+class PaymentResponse(BaseModel):
+    id: str
+    user_id: str
+    order_id: Optional[str] = None
+    gateway: str
+    gateway_payment_id: Optional[str] = None
+    utr: Optional[str] = None
+    amount: float
+    currency: str
+    plan: str
+    status: str
+    verification_method: str
+    verified_at: Optional[datetime] = None
+    created_at: datetime

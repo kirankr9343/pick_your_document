@@ -11,7 +11,7 @@ from sqlalchemy import select, func, desc, or_, and_
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.deps import get_current_admin, get_current_super_admin
-from app.models.models import User, ProcessingJob, UsageRecord, ToolStatus, AdminAuditLog
+from app.models.models import User, ProcessingJob, UsageRecord, ToolStatus, AdminAuditLog, Payment
 from app.schemas.schemas import (
     UserResponse,
     JobResponse,
@@ -23,8 +23,12 @@ from app.schemas.schemas import (
     PaginatedUsersResponse,
     PaginatedJobsResponse,
     PaginatedAuditLogsResponse,
-    AdminDashboardMetrics
+    AdminDashboardMetrics,
+    PaymentResponse,
+    AdminPaymentReviewRequest
 )
+from app.services.payment_service import admin_review_payment
+
 
 router = APIRouter()
 
@@ -594,3 +598,87 @@ async def get_audit_logs(
         limit=limit,
         total_pages=total_pages
     )
+
+@router.get("/payments", response_model=List[PaymentResponse])
+async def get_admin_payments(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """
+    Returns payment records including pending UTR verification queue.
+    Join with User to include user email.
+    """
+    query = select(Payment, User.email.label("user_email")).outerjoin(User, Payment.user_id == User.id)
+
+    if status_filter:
+        query = query.where(Payment.status == status_filter.upper())
+
+    query = query.order_by(desc(Payment.created_at))
+    res = await db.execute(query)
+    rows = res.all()
+
+    payment_responses = []
+    for row in rows:
+        p, email_val = row[0], row[1]
+        payment_responses.append(PaymentResponse(
+            id=p.id,
+            user_id=p.user_id,
+            user_email=email_val,
+            order_id=p.order_id,
+            gateway=p.gateway,
+            gateway_payment_id=p.gateway_payment_id,
+            utr=p.utr,
+            amount=p.amount,
+            currency=p.currency,
+            plan=p.plan,
+            status=p.status,
+            verification_method=p.verification_method,
+            created_at=p.created_at,
+            verified_at=p.verified_at
+        ))
+
+    return payment_responses
+
+@router.post("/payments/{payment_id}/review", response_model=PaymentResponse)
+async def review_admin_payment(
+    payment_id: str,
+    payload: AdminPaymentReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """
+    Admin approval or rejection of a pending UTR payment.
+    Updates payment status, activates user subscription if approved, and writes to audit log.
+    """
+    try:
+        payment = await admin_review_payment(
+            db=db,
+            admin=admin,
+            payment_id=payment_id,
+            action=payload.action
+        )
+        
+        # Get user email
+        user_res = await db.execute(select(User.email).where(User.id == payment.user_id))
+        email_val = user_res.scalar()
+
+        return PaymentResponse(
+            id=payment.id,
+            user_id=payment.user_id,
+            user_email=email_val,
+            order_id=payment.order_id,
+            gateway=payment.gateway,
+            gateway_payment_id=payment.gateway_payment_id,
+            utr=payment.utr,
+            amount=payment.amount,
+            currency=payment.currency,
+            plan=payment.plan,
+            status=payment.status,
+            verification_method=payment.verification_method,
+            created_at=payment.created_at,
+            verified_at=payment.verified_at
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+

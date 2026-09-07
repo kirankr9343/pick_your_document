@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import converters, pdf, ai, download, auth, admin, health
+from app.api.v1.endpoints import converters, pdf, ai, download, auth, admin, health, payments
 
 api_router = APIRouter()
 
@@ -9,4 +9,6 @@ api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(download.router, prefix="/download", tags=["download"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
+

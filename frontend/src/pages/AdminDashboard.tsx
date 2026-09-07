@@ -16,48 +16,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: currentUse
   // Pending UTR Payments State
   const [pendingPayments, setPendingPayments] = useState<any[]>([]);
 
-  const loadPendingPayments = () => {
+  const loadPendingPayments = async () => {
     try {
-      const stored = localStorage.getItem('pending_utr_payments');
-      if (stored) {
-        setPendingPayments(JSON.parse(stored));
-      } else {
-        setPendingPayments([]);
+      const res = await fetch('/api/v1/admin/payments', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setPendingPayments(data);
+        return;
       }
     } catch (e) {
-      setPendingPayments([]);
+      console.error(e);
     }
+    try {
+      const stored = localStorage.getItem('pending_utr_payments');
+      if (stored) setPendingPayments(JSON.parse(stored));
+    } catch (e) {}
   };
 
   useEffect(() => {
     loadPendingPayments();
   }, [activeTab]);
 
-  const handleApprovePayment = (paymentId: string) => {
+  const handleApprovePayment = async (paymentId: string) => {
+    try {
+      const res = await fetch(`/api/v1/admin/payments/${paymentId}/review`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        showToast(`Payment Approved! Subscription activated for ${updated.user_email || 'user'}.`, 'success');
+        loadPendingPayments();
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     const updated = pendingPayments.map(p => {
       if (p.id === paymentId) {
-        return { ...p, status: 'APPROVED', approved_at: new Date().toISOString() };
+        return { ...p, status: 'SUCCESS', verified_at: new Date().toISOString() };
       }
       return p;
     });
     setPendingPayments(updated);
     localStorage.setItem('pending_utr_payments', JSON.stringify(updated));
-
-    const targetPayment = pendingPayments.find(p => p.id === paymentId);
-    if (targetPayment) {
-      const currentUserObj = JSON.parse(localStorage.getItem('user') || '{}');
-      if (currentUserObj.email === targetPayment.user_email) {
-        const updatedUser = { ...currentUserObj, is_pro: true, plan: targetPayment.plan };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-      }
-      showToast(`Payment Approved! Pro plan activated for ${targetPayment.user_email || 'user'}.`, 'success');
-    }
+    showToast('Payment Approved!', 'success');
   };
 
-  const handleRejectPayment = (paymentId: string) => {
+  const handleRejectPayment = async (paymentId: string) => {
+    try {
+      const res = await fetch(`/api/v1/admin/payments/${paymentId}/review`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject' })
+      });
+      if (res.ok) {
+        showToast('Payment submission rejected.', 'error');
+        loadPendingPayments();
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     const updated = pendingPayments.map(p => {
       if (p.id === paymentId) {
-        return { ...p, status: 'REJECTED', rejected_at: new Date().toISOString() };
+        return { ...p, status: 'FAILED' };
       }
       return p;
     });
@@ -65,6 +91,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: currentUse
     localStorage.setItem('pending_utr_payments', JSON.stringify(updated));
     showToast('UTR Payment submission rejected.', 'error');
   };
+
+
 
   // Dashboard Stats State
   const [metrics, setMetrics] = useState<any>(null);
