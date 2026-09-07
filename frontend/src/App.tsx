@@ -86,11 +86,14 @@ export const App: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    // 1. Check if Google Identity Services (GIS) library is available
-    if ((window as any).google?.accounts?.oauth2) {
+    const rawClientId = ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || '';
+    const isRealClientId = rawClientId && !rawClientId.includes('sampleclientid') && !rawClientId.includes('your_google_client_id');
+
+    // 1. Check if Google Identity Services (GIS) library is available and a real Client ID is configured
+    if (isRealClientId && (window as any).google?.accounts?.oauth2) {
       try {
         const client = (window as any).google.accounts.oauth2.initCodeClient({
-          client_id: '1084920284712-sampleclientid.apps.googleusercontent.com',
+          client_id: rawClientId,
           scope: 'openid email profile',
           ux_mode: 'popup',
           callback: async (response: any) => {
@@ -107,23 +110,28 @@ export const App: React.FC = () => {
                     return;
                   }
                 }
-              } catch (e) {}
+              } catch (e) {
+                console.error("Google auth error:", e);
+              }
             }
           }
         });
         client.requestCode();
         return;
-      } catch (e) {}
+      } catch (e) {
+        console.error("GIS init error:", e);
+      }
     }
 
-    // 2. Fallback to Google OAuth authorization URL / local Google authentication session
+    // 2. Fallback to Google OAuth prompt / local Google session sign-in
     const promptEmail = window.prompt("Enter your Gmail address to sign in with Google:", "kirankr93439343@gmail.com");
     if (promptEmail) {
-      const isSuperAdmin = promptEmail.toLowerCase() === 'kirankr93439343@gmail.com';
+      const cleanEmail = promptEmail.trim();
+      const isSuperAdmin = cleanEmail.toLowerCase() === 'kirankr93439343@gmail.com';
       const googleUser = {
         id: 'google_' + Math.random().toString(36).substring(2, 8),
-        email: promptEmail,
-        name: promptEmail.split('@')[0],
+        email: cleanEmail,
+        name: cleanEmail.split('@')[0],
         role: isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
         is_admin: isSuperAdmin,
         provider: 'google'
