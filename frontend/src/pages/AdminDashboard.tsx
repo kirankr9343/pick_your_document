@@ -5,6 +5,7 @@ import {
   FileCheck, Shield, ChevronLeft, ChevronRight, Settings, ListFilter, AlertCircle, UserCheck, UserX, CreditCard
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getApiUrl } from '../config/api';
 
 interface AdminDashboardProps {
   user?: any;
@@ -18,7 +19,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: currentUse
 
   const loadPendingPayments = async () => {
     try {
-      const res = await fetch('/api/v1/admin/payments', { headers: getAuthHeaders() });
+      const res = await fetch(getApiUrl('/api/v1/admin/payments'), { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setPendingPayments(data);

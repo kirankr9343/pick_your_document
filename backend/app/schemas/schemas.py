@@ -185,3 +185,8 @@ class PaymentResponse(BaseModel):
     verification_method: str
     verified_at: Optional[datetime] = None
     created_at: datetime
+
+class AdminPaymentReviewRequest(BaseModel):
+    action: str = Field(..., description="approve or reject")
+    note: Optional[str] = None
+

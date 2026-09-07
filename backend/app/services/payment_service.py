@@ -110,3 +110,37 @@ class PaymentVerificationService:
         await db.commit()
         await db.refresh(payment)
         return payment
+
+async def admin_review_payment(
+    db: AsyncSession,
+    payment_id: str,
+    admin_user: User,
+    approve: bool
+) -> Payment:
+    """Module-level wrapper for admin review of payment."""
+    return await PaymentVerificationService.admin_review_payment(
+        db=db,
+        payment_id=payment_id,
+        admin_user=admin_user,
+        approve=approve
+    )
+
+async def submit_utr_payment(
+    db: AsyncSession,
+    user_id: str,
+    utr_code: str,
+    amount: float,
+    plan_name: str = "Pro Plan",
+    currency: str = "INR"
+) -> Payment:
+    """Module-level wrapper for submit_utr_payment."""
+    return await PaymentVerificationService.submit_utr_payment(
+        db=db,
+        user_id=user_id,
+        utr_code=utr_code,
+        amount=amount,
+        plan_name=plan_name,
+        currency=currency
+    )
+
+

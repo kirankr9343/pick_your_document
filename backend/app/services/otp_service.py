@@ -134,3 +134,35 @@ class OTPService:
         otp_record.used_at = datetime.utcnow()
         await db.commit()
         return otp_record
+
+async def create_otp(
+    db: AsyncSession,
+    destination: str,
+    purpose: str,
+    user_id: Optional[str] = None,
+    destination_type: str = "email"
+) -> str:
+    """Module-level helper function to generate and save an OTP, returning the plaintext 6-digit code."""
+    plaintext_otp, _ = await OTPService.create_otp(
+        db=db,
+        destination=destination,
+        purpose=purpose,
+        user_id=user_id,
+        destination_type=destination_type
+    )
+    return plaintext_otp
+
+async def verify_otp_code(
+    db: AsyncSession,
+    destination: str,
+    otp_code: str,
+    purpose: str = "LOGIN"
+) -> OTPVerification:
+    """Module-level helper function to verify an OTP code."""
+    return await OTPService.verify_otp(
+        db=db,
+        destination=destination,
+        purpose=purpose,
+        otp_input=otp_code
+    )
+

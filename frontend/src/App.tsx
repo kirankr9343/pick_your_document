@@ -12,6 +12,7 @@ import { LegalPage } from './pages/LegalPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserDashboard } from './pages/UserDashboard';
 import { X, Lock, Mail, ShieldAlert, Sparkles, User as UserIcon, Phone, KeyRound, ArrowRight, RefreshCw } from 'lucide-react';
+import { getApiUrl } from './config/api';
 
 export const AppContent: React.FC = () => {
   const navigate = useNavigate();
@@ -152,7 +153,7 @@ export const AppContent: React.FC = () => {
 
     try {
       if (authMode === 'login') {
-        const res = await fetch('/api/v1/auth/login', {
+        const res = await fetch(getApiUrl('/api/v1/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password: passwordInput })
@@ -173,7 +174,7 @@ export const AppContent: React.FC = () => {
           setAuthSuccessMsg(data.message || `Verification code sent to ${data.destination_masked}`);
         }
       } else if (authMode === 'register') {
-        const res = await fetch('/api/v1/auth/register', {
+        const res = await fetch(getApiUrl('/api/v1/auth/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -199,7 +200,7 @@ export const AppContent: React.FC = () => {
           setAuthSuccessMsg(data.message || `Account created! Verification code sent to ${data.destination_masked}`);
         }
       } else if (authMode === 'forgot_password') {
-        const res = await fetch('/api/v1/auth/forgot-password', {
+        const res = await fetch(getApiUrl('/api/v1/auth/forgot-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email })
@@ -235,7 +236,7 @@ export const AppContent: React.FC = () => {
 
     try {
       if (otpPurpose === 'PASSWORD_RESET') {
-        const res = await fetch('/api/v1/auth/reset-password', {
+        const res = await fetch(getApiUrl('/api/v1/auth/reset-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -259,7 +260,7 @@ export const AppContent: React.FC = () => {
         return;
       }
 
-      const res = await fetch('/api/v1/auth/verify-otp', {
+      const res = await fetch(getApiUrl('/api/v1/auth/verify-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -294,7 +295,7 @@ export const AppContent: React.FC = () => {
     setAuthSuccessMsg(null);
 
     try {
-      const res = await fetch('/api/v1/auth/resend-otp', {
+      const res = await fetch(getApiUrl('/api/v1/auth/resend-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -354,7 +355,7 @@ export const AppContent: React.FC = () => {
 
     try {
       // Dispatch real 6-digit OTP email via backend
-      const res = await fetch('/api/v1/auth/resend-otp', {
+      const res = await fetch(getApiUrl('/api/v1/auth/resend-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -384,7 +385,7 @@ export const AppContent: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/v1/auth/logout', { method: 'POST' });
+      await fetch(getApiUrl('/api/v1/auth/logout'), { method: 'POST' });
     } catch (e) {}
     setUser(null);
     localStorage.removeItem('access_token');

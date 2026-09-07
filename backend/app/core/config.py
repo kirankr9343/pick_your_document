@@ -30,8 +30,14 @@ class Settings(BaseSettings):
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = "kirankr93439343@gmail.com"
-    SMTP_PASSWORD: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = "wotikroyqwkhnrnx"
     EMAILS_FROM_EMAIL: str = "kirankr93439343@gmail.com"
+
+    # OTP Security Settings
+    OTP_EXPIRY_MINUTES: int = 5
+    OTP_MAX_ATTEMPTS: int = 5
+    OTP_RESEND_COOLDOWN_SECONDS: int = 60
+
 
     # Rate Limits
     ANONYMOUS_REQUESTS_PER_HOUR: int = 60

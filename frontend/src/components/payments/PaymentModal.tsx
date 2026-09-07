@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, CreditCard, QrCode, Smartphone, Building2, Sparkles, ArrowRight, Copy, ExternalLink, AlertTriangle } from 'lucide-react';
+import { getApiUrl } from '../../config/api';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch('/api/v1/payments/utr', {
+      const res = await fetch(getApiUrl('/api/v1/payments/utr'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
