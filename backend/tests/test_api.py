@@ -1,16 +1,10 @@
 import os
-import asyncio
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
-from app.core.database import init_db
 
 TEST_DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "test-data"))
-
-@pytest.fixture(autouse=True)
-def setup_db():
-    asyncio.run(init_db())
 
 def test_health_endpoint():
     with TestClient(app) as client:

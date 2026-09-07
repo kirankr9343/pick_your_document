@@ -1,15 +1,9 @@
 import os
-import asyncio
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
-from app.core.database import init_db
 from app.core.config import settings
-
-@pytest.fixture(autouse=True)
-def setup_db():
-    asyncio.run(init_db())
 
 def _authenticate_user(client, email, password, name="User"):
     """Helper to perform 2-Step Email + Password + OTP authentication in tests."""
